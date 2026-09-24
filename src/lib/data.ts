@@ -11,9 +11,13 @@ export async function getProduct(
     .eq("active", true)
     .single();
   if (error) return null;
-  const result=data as Product;
-  result.images?.sort((a,b)=>a.position-b.position);
-  result.variants.sort((a,b)=>['S','M','L','XL'].indexOf(a.size)-['S','M','L','XL'].indexOf(b.size));
+  const result = data as Product;
+  result.images?.sort((a, b) => a.position - b.position);
+  result.variants.sort(
+    (a, b) =>
+      ["S", "M", "L", "XL"].indexOf(a.size) -
+      ["S", "M", "L", "XL"].indexOf(b.size),
+  );
   return result;
 }
 export async function getCatalog(): Promise<Product[]> {
@@ -23,7 +27,7 @@ export async function getCatalog(): Promise<Product[]> {
     .select("*,variants(*),images(*)")
     .eq("active", true)
     .order("created_at");
-  return (data||[]) as Product[];
+  return (data || []) as Product[];
 }
 export async function getSettings() {
   if (!configured()) return null;

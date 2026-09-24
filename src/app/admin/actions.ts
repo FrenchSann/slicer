@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 import { eu } from "@/lib/catalog";
+import sharp from "sharp";
 type Result = { message: string };
 const string = (form: FormData, key: string) => String(form.get(key) || "");
 const checkbox = (form: FormData, key: string) => form.get(key) === "on";
@@ -111,6 +112,9 @@ export async function saveSettings(_: Result, form: FormData): Promise<Result> {
         contact_email: z.union([z.email(), z.literal("")]),
         shipping_copy: z.string().max(4000),
         returns_copy: z.string().max(4000),
+        legal_copy: z.string().max(20000),
+        privacy_copy: z.string().max(20000),
+        terms_copy: z.string().max(20000),
         legal_verified: z.boolean(),
         tax_verified: z.boolean(),
         shipping_verified: z.boolean(),
@@ -123,6 +127,9 @@ export async function saveSettings(_: Result, form: FormData): Promise<Result> {
         contact_email: string(form, "contact_email"),
         shipping_copy: string(form, "shipping_copy"),
         returns_copy: string(form, "returns_copy"),
+        legal_copy: string(form, "legal_copy"),
+        privacy_copy: string(form, "privacy_copy"),
+        terms_copy: string(form, "terms_copy"),
         legal_verified: checkbox(form, "legal_verified"),
         tax_verified: checkbox(form, "tax_verified"),
         shipping_verified: checkbox(form, "shipping_verified"),
@@ -196,15 +203,13 @@ export async function saveShipment(_: Result, form: FormData): Promise<Result> {
       return { message: "Une commande payée est requise." };
     if (status !== "preparing" && (!tracking_number || !carrier))
       return { message: "Renseignez le transporteur et le numéro de suivi." };
-    const { error } = await db
-      .from("shipments")
-      .upsert({
-        order_id,
-        status,
-        tracking_number,
-        carrier,
-        updated_at: new Date().toISOString(),
-      });
+    const { error } = await db.from("shipments").upsert({
+      order_id,
+      status,
+      tracking_number,
+      carrier,
+      updated_at: new Date().toISOString(),
+    });
     if (error) throw error;
     revalidatePath("/admin");
     return { message: "Expédition mise à jour." };
@@ -233,23 +238,34 @@ export async function uploadImage(_: Result, form: FormData): Promise<Result> {
       bytes.subarray(8, 12).toString() === "WEBP";
     if (!png && !jpg && !webp)
       return { message: "Formats autorisés : JPEG, PNG, WebP." };
-    const type = png ? "png" : jpg ? "jpeg" : "webp";
-    const path = product_id + "/" + randomUUID() + "." + type;
+    const alt = z.string().min(1).max(200).parse(string(form, "alt"));
+    const position = z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .parse(Number(form.get("position")));
+    const safeImage = await sharp(bytes, { limitInputPixels: 25000000 })
+      .rotate()
+      .resize({
+        width: 2400,
+        height: 2400,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 88 })
+      .toBuffer();
+    const path = product_id + "/" + randomUUID() + ".webp";
     const { error } = await db.storage
       .from("products")
-      .upload(path, bytes, { contentType: `image/${type}`, upsert: false });
+      .upload(path, safeImage, { contentType: "image/webp", upsert: false });
     if (error) throw error;
     const { data } = db.storage.from("products").getPublicUrl(path);
     const { error: insertError } = await db.from("images").insert({
       product_id,
       url: data.publicUrl,
-      alt: z.string().min(1).max(200).parse(string(form, "alt")),
-      position: z
-        .number()
-        .int()
-        .min(0)
-        .max(100)
-        .parse(Number(form.get("position"))),
+      alt,
+      position,
     });
     if (insertError) throw insertError;
     revalidatePath("/", "layout");

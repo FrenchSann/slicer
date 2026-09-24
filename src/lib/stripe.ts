@@ -6,6 +6,12 @@ export function stripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw Error("Stripe non configuré");
   if (
+    process.env.COMMERCE_MODE === "live" &&
+    !key.startsWith("sk_live_") &&
+    !key.startsWith("rk_live_")
+  )
+    throw Error("Live key required");
+  if (
     process.env.COMMERCE_MODE !== "live" &&
     !key.startsWith("sk_test_") &&
     !key.startsWith("rk_test_")

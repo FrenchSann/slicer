@@ -1,6 +1,8 @@
 import { serviceDb } from "@/lib/db";
 import { assertOrigin, rate, failure } from "@/lib/security";
 import { contactSchema } from "@/lib/validation";
+import { after } from "next/server";
+import { deliverEmails } from "@/lib/email";
 export async function POST(req: Request) {
   if (
     !process.env.CONTACT_EMAIL ||
@@ -26,15 +28,20 @@ export async function POST(req: Request) {
       .select("id")
       .single();
     if (error) throw error;
-    const { error: mailError } = await db
-      .from("email_outbox")
-      .insert({
-        dedupe_key: `contact:${data.id}`,
-        recipient: process.env.CONTACT_EMAIL,
-        subject: "SLICER — nouveau message",
-        body: `De : ${parsed.data.email}\n\n${parsed.data.message}`,
-      });
+    const { error: mailError } = await db.from("email_outbox").insert({
+      dedupe_key: `contact:${data.id}`,
+      recipient: process.env.CONTACT_EMAIL,
+      subject: "SLICER — nouveau message",
+      body: `De : ${parsed.data.email}\n\n${parsed.data.message}`,
+    });
     if (mailError) throw mailError;
+    after(async () => {
+      try {
+        await deliverEmails();
+      } catch {
+        console.error("email_delivery_deferred");
+      }
+    });
     return Response.json({
       message: "Votre message est enregistré. Merci de nous avoir écrit.",
     });

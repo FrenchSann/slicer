@@ -327,6 +327,20 @@ export default async function Admin() {
                 rows={4}
               />
             </label>
+            {(["legal_copy", "privacy_copy", "terms_copy"] as const).map(
+              (key, index) => (
+                <label className="field" key={key}>
+                  {
+                    [
+                      "Mentions légales définitives",
+                      "Politique de confidentialité définitive",
+                      "Conditions de vente définitives",
+                    ][index]
+                  }
+                  <textarea name={key} defaultValue={s?.[key] || ""} rows={6} />
+                </label>
+              ),
+            )}
             <Check
               name="legal_verified"
               label="Documents légaux finalisés et vérifiés"

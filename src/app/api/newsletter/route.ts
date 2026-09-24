@@ -2,6 +2,8 @@ import { randomBytes } from "crypto";
 import { newsletterSchema } from "@/lib/validation";
 import { serviceDb } from "@/lib/db";
 import { assertOrigin, rate, hash, failure } from "@/lib/security";
+import { after } from "next/server";
+import { deliverEmails } from "@/lib/email";
 export async function POST(req: Request) {
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)
     return failure("Les inscriptions ouvriront prochainement.");
@@ -26,29 +28,32 @@ export async function POST(req: Request) {
       return Response.json({
         message: "Si nécessaire, un e-mail de confirmation vous sera envoyé.",
       });
-    const { error } = await db
-      .from("newsletter")
-      .upsert(
-        {
-          email,
-          status: "pending",
-          token_hash: hash(token),
-          consent_text:
-            "Je souhaite recevoir les prochains drops SLICER par e-mail. Version 1.",
-          consent_at: new Date().toISOString(),
-        },
-        { onConflict: "email" },
-      );
+    const { error } = await db.from("newsletter").upsert(
+      {
+        email,
+        status: "pending",
+        token_hash: hash(token),
+        consent_text:
+          "Je souhaite recevoir les prochains drops SLICER par e-mail. Version 1.",
+        consent_at: new Date().toISOString(),
+      },
+      { onConflict: "email" },
+    );
     if (error) throw error;
-    const { error: mailError } = await db
-      .from("email_outbox")
-      .insert({
-        dedupe_key: `newsletter:${hash(token)}`,
-        recipient: email,
-        subject: "Confirmez votre inscription SLICER",
-        body: `Confirmez votre inscription : ${process.env.NEXT_PUBLIC_SITE_URL}/newsletter/${token}\nDésinscription : ${process.env.NEXT_PUBLIC_SITE_URL}/newsletter/${token}?action=unsubscribe`,
-      });
+    const { error: mailError } = await db.from("email_outbox").insert({
+      dedupe_key: `newsletter:${hash(token)}`,
+      recipient: email,
+      subject: "Confirmez votre inscription SLICER",
+      body: `Confirmez votre inscription : ${process.env.NEXT_PUBLIC_SITE_URL}/newsletter/${token}\nDésinscription : ${process.env.NEXT_PUBLIC_SITE_URL}/newsletter/${token}?action=unsubscribe`,
+    });
     if (mailError) throw mailError;
+    after(async () => {
+      try {
+        await deliverEmails();
+      } catch {
+        console.error("email_delivery_deferred");
+      }
+    });
     return Response.json({
       message:
         "Votre demande est enregistrée. Confirmez votre inscription depuis l’e-mail à venir.",

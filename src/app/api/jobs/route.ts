@@ -1,44 +1,62 @@
 import { timingSafeEqual } from "crypto";
+import type Stripe from "stripe";
 import { serviceDb } from "@/lib/db";
 import { stripe, applySession } from "@/lib/stripe";
 import { failure } from "@/lib/security";
-import type Stripe from "stripe";
+import { deliverEmails } from "@/lib/email";
 export async function GET(req: Request) {
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
-  const actual = req.headers.get("authorization") || "";
+  const expected = Buffer.from(`Bearer ${process.env.CRON_SECRET}`);
+  const actual = Buffer.from(req.headers.get("authorization") || "");
   if (
     !process.env.CRON_SECRET ||
     expected.length !== actual.length ||
-    !timingSafeEqual(Buffer.from(expected), Buffer.from(actual))
+    !timingSafeEqual(expected, actual)
   )
     return failure("Non autorisé", 401);
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY)
+    return failure("Configuration du service requise.");
   const db = serviceDb();
-  let sent = 0,
-    failed = 0,
+  let failed = 0,
     reconciled = 0;
-  const { data: pending } = await db
+  const { data: pending, error } = await db
     .from("orders")
     .select("*")
     .eq("status", "pending")
+    .eq("mode", process.env.COMMERCE_MODE === "live" ? "live" : "test")
     .lt("expires_at", new Date().toISOString())
-    .limit(50);
+    .limit(10);
+  if (error) return failure();
   for (const order of pending || []) {
     try {
-      const api = stripe();
-      let session;
-      if (order.session_id)
-        session = await api.checkout.sessions.retrieve(order.session_id);
-      else if (order.checkout_payload) {
-        session = await api.checkout.sessions.create(
-          order.checkout_payload as Stripe.Checkout.SessionCreateParams,
-          { idempotencyKey: `checkout:${order.id}` },
-        );
-        await db
-          .from("orders")
-          .update({ session_id: session.id })
-          .eq("id", order.id);
-      } else {
-        const { error } = await db.rpc("apply_checkout_event", {
+      let session: Stripe.Checkout.Session | undefined;
+      if (order.session_id) {
+        session = await stripe().checkout.sessions.retrieve(order.session_id);
+      } else if (order.checkout_payload) {
+        // Exhaust the bounded creation window: an unknown Stripe response must not
+        // release inventory before checking whether the payment actually succeeded.
+        const api = stripe();
+        for await (const candidate of api.checkout.sessions.list({
+          created: {
+            gte: Math.floor(new Date(order.created_at).getTime() / 1000) - 60,
+            lte: Math.ceil(new Date(order.expires_at).getTime() / 1000),
+          },
+          limit: 100,
+        })) {
+          if (candidate.metadata?.order_id === order.id) {
+            session = candidate;
+            break;
+          }
+        }
+        if (session) {
+          const { error: bindError } = await db
+            .from("orders")
+            .update({ session_id: session.id })
+            .eq("id", order.id);
+          if (bindError) throw bindError;
+        }
+      }
+      if (!session) {
+        const { error: releaseError } = await db.rpc("apply_checkout_event", {
           p_event: `orphan:${order.id}`,
           p_order: order.id,
           p_session: `none:${order.id}`,
@@ -50,62 +68,26 @@ export async function GET(req: Request) {
           p_address: {},
           p_mail: "",
         });
-        if (error) throw error;
+        if (releaseError) throw releaseError;
         reconciled++;
         continue;
       }
       if (session.status === "open")
-        session = await api.checkout.sessions.expire(session.id);
+        session = await stripe().checkout.sessions.expire(session.id);
       await applySession(session, `reconcile:${session.id}:${session.status}`);
       reconciled++;
     } catch {
       failed++;
+      console.error("order_reconciliation_deferred", { orderId: order.id });
     }
   }
-  if (process.env.RESEND_API_KEY && process.env.EMAIL_FROM) {
-    const { data: emails, error } = await db.rpc("claim_emails");
-    if (error) return failure();
-    for (const mail of emails || []) {
-      try {
-        const result = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-            "Idempotency-Key": mail.id,
-          },
-          body: JSON.stringify({
-            from: process.env.EMAIL_FROM,
-            to: [mail.recipient],
-            subject: mail.subject,
-            text: mail.body,
-          }),
-        });
-        if (!result.ok) throw Error(`HTTP ${result.status}`);
-        await db
-          .from("email_outbox")
-          .update({
-            sent_at: new Date().toISOString(),
-            locked_until: null,
-            last_error: null,
-          })
-          .eq("id", mail.id);
-        sent++;
-      } catch {
-        await db
-          .from("email_outbox")
-          .update({
-            locked_until: null,
-            last_error: "Delivery failed",
-            next_attempt_at: new Date(
-              Date.now() +
-                Math.min(86400000, 60000 * 2 ** Math.min(mail.attempts, 10)),
-            ).toISOString(),
-          })
-          .eq("id", mail.id);
-        failed++;
-      }
-    }
+  try {
+    const mail = await deliverEmails();
+    return Response.json(
+      { sent: mail.sent, failed: failed + mail.failed, reconciled },
+      { status: failed + mail.failed ? 207 : 200 },
+    );
+  } catch {
+    return failure("Réessai des e-mails nécessaire.", 500);
   }
-  return Response.json({ sent, failed, reconciled });
 }

@@ -1,0 +1,2 @@
+create or replace function public.claim_emails() returns setof email_outbox language sql security definer set search_path=public as $$
+update email_outbox set locked_until=now()+interval '5 minutes',attempts=attempts+1 where id in(select id from email_outbox where sent_at is null and next_attempt_at<=now() and (locked_until is null or locked_until<now()) order by next_attempt_at limit 5 for update skip locked) returning * $$;

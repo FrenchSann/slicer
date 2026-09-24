@@ -133,6 +133,19 @@ export default async function Info({
             Besoin d’aide ↗
           </Link>
         </>
+      ) : s?.legal_verified &&
+        (page === "mentions-legales"
+          ? s.legal_copy
+          : page === "confidentialite"
+            ? s.privacy_copy
+            : s.terms_copy) ? (
+        <div style={{ whiteSpace: "pre-wrap" }}>
+          {page === "mentions-legales"
+            ? s.legal_copy
+            : page === "confidentialite"
+              ? s.privacy_copy
+              : s.terms_copy}
+        </div>
       ) : (
         <>
           <div className="notice">

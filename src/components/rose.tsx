@@ -16,7 +16,7 @@ import {
   Group,
   MathUtils,
 } from "three";
-function petalGeometry() {
+function petalGeometry(layer = 2) {
   const points: number[] = [];
   const indices: number[] = [];
   const n = 22;
@@ -24,13 +24,17 @@ function petalGeometry() {
     for (let x = 0; x <= n; x++) {
       const u = (x / n) * 2 - 1,
         v = y / n;
-      const width = Math.sin(Math.PI * v * 0.88) * 0.9 + 0.025;
+      const spread = (0.6 - layer * 0.045) * Math.sin(Math.PI * v * 0.78);
+      const radius = 0.035 + layer * 0.14 + v * (0.38 + layer * 0.21);
+      const angle = u * spread;
       points.push(
-        u * width,
-        v * 1.9,
-        Math.pow(v, 2) * 0.72 +
-          u * u * 0.42 * Math.sin(v * Math.PI) -
-          Math.pow(v, 7) * 0.58,
+        Math.sin(angle) * radius,
+        Math.cos(angle) * radius,
+        0.55 -
+          layer * 0.1 +
+          Math.sin(v * Math.PI * 0.86) * (0.2 + layer * 0.025) -
+          v * v * 0.35 +
+          u * u * v * 0.18,
       );
     }
   for (let y = 0; y < n; y++)
@@ -50,8 +54,12 @@ function Flower({
   input: React.RefObject<{ x: number; y: number; scroll: number }>;
 }) {
   const ref = useRef<Group>(null);
-  const geometry = useMemo(petalGeometry, []);
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  const geometries = useMemo(
+    () => Array.from({ length: 6 }, (_, i) => petalGeometry(i)),
+    [],
+  );
+  const geometry = geometries[2];
+  useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
   useFrame((_, delta) => {
     if (!ref.current) return;
     ref.current.rotation.y = MathUtils.damp(
@@ -69,29 +77,22 @@ function Flower({
   });
   return (
     <group ref={ref} rotation={[-0.35, 0, 0.12]}>
-      <group rotation={[Math.PI / 2, 0, 0]}>
-        {Array.from({ length: 38 }, (_, i) => {
-          const layer = Math.floor(i / 8),
-            a = i * 2.39996,
-            r = 0.12 + layer * 0.11,
-            s = 0.38 + layer * 0.17;
-          return (
-            <mesh
-              key={i}
-              geometry={geometry}
-              position={[Math.sin(a) * r, -layer * 0.12, Math.cos(a) * r]}
-              rotation={[0, a, 0]}
-              scale={s}
-            >
-              <meshStandardMaterial
-                color={i % 4 === 0 ? "#f33342" : "#cf1328"}
-                side={DoubleSide}
-                roughness={0.48}
-                metalness={0.05}
-              />
-            </mesh>
-          );
-        })}
+      <group rotation={[0, 0, 0.15]}>
+        {geometries.flatMap((g, layer) =>
+          Array.from({ length: 5 + layer * 2 }, (_, i) => {
+            const a = (i * Math.PI * 2) / (5 + layer * 2) + layer * 0.65;
+            return (
+              <mesh key={`${layer}-${i}`} geometry={g} rotation={[0, 0, a]}>
+                <meshStandardMaterial
+                  color={i % 4 === 0 ? "#f33342" : "#cf1328"}
+                  side={DoubleSide}
+                  roughness={0.48}
+                  metalness={0.05}
+                />
+              </mesh>
+            );
+          }),
+        )}
       </group>
       {[
         [-2, 0.9, -0.7],

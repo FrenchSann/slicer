@@ -2,6 +2,8 @@ import { stripe, applySession } from "@/lib/stripe";
 import { serviceDb } from "@/lib/db";
 import { failure } from "@/lib/security";
 import type Stripe from "stripe";
+import { after } from "next/server";
+import { deliverEmails } from "@/lib/email";
 export async function POST(req: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) return failure();
@@ -36,6 +38,13 @@ export async function POST(req: Request) {
         if (error) throw error;
       }
     }
+    after(async () => {
+      try {
+        await deliverEmails();
+      } catch {
+        console.error("email_delivery_deferred");
+      }
+    });
     return Response.json({ received: true });
   } catch {
     return failure("Traitement en attente de réessai.", 500);

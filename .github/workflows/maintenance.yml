@@ -1,0 +1,23 @@
+name: Commerce maintenance
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+permissions: {}
+jobs:
+  reconcile:
+    if: vars.COMMERCE_JOBS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Reconcile reservations and retry email delivery
+        env:
+          CRON_SECRET: ${{ secrets.SLICER_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Maintenance secret is not configured."
+            exit 1
+          fi
+          curl --fail-with-body --retry 2 --max-time 120 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://slicer-navy.vercel.app/api/jobs

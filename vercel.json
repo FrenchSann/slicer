@@ -1,0 +1,7 @@
+{
+  "regions": ["cdg1"],
+  "functions": {
+    "src/app/api/jobs/route.ts": { "maxDuration": 60 },
+    "src/app/api/stripe/webhook/route.ts": { "maxDuration": 30 }
+  }
+}

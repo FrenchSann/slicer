@@ -3,7 +3,12 @@ import Image from "next/image";
 import HeroScene from "@/components/hero-scene";
 import { Signup } from "@/components/shop";
 import { ArrowRightIcon, ArrowDownIcon } from "@radix-ui/react-icons";
-export default function Home() {
+import { getProduct } from "@/lib/data";
+import { money } from "@/lib/catalog";
+export const dynamic = "force-dynamic";
+export default async function Home() {
+  const data = await getProduct();
+  const price = data?.variants[0]?.price;
   return (
     <>
       <section className="hero">
@@ -28,7 +33,11 @@ export default function Home() {
           </Link>
           <div className="hero-note">
             <span>01 — COLLECTION</span>
-            <span>45 € TTC / S—XL</span>
+            <span>
+              {price
+                ? `${money(price)} TTC / S—XL`
+                : "COLLECTION EN PRÉPARATION"}
+            </span>
           </div>
         </div>
         <div className="hero-art">
@@ -102,7 +111,7 @@ export default function Home() {
               <p>Rashguard manches courtes · Blanc / rouge</p>
             </div>
             <span>
-              45 € TTC <ArrowRightIcon />
+              {price ? `${money(price)} TTC` : "Découvrir"} <ArrowRightIcon />
             </span>
           </div>
         </Link>

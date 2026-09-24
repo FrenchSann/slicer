@@ -17,7 +17,7 @@ export default async function ProductPage({
         <Link href="/collection">Collection</Link> / {data.name}
       </div>
       <div className="product-page">
-        <Gallery images={data.images}/>
+        <Gallery images={data.images} />
         <section>
           <span className="eyebrow">SLICER / RASHGUARD NO-GI</span>
           <h1>

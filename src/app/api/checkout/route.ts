@@ -11,6 +11,12 @@ export async function POST(req: Request) {
       409,
     );
   try {
+    if (
+      !process.env.TOKEN_SECRET ||
+      !process.env.NEXT_PUBLIC_SITE_URL ||
+      !process.env.STRIPE_WEBHOOK_SECRET
+    )
+      return failure("Le paiement est en cours de configuration.");
     assertOrigin(req);
     await rate(req, "checkout", 8);
     const parsed = checkoutSchema.safeParse(await req.json());
@@ -73,7 +79,7 @@ export async function POST(req: Request) {
       ],
       metadata: { order_id: id },
       payment_intent_data: { metadata: { order_id: id } },
-      success_url: `${base}/suivi/${token}?retour=1`,
+      success_url: `${base}/confirmation`,
       cancel_url: `${base}/paiement-annule`,
       expires_at: Math.floor(Date.now() / 1000) + 1800,
     };

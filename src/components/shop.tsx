@@ -59,7 +59,11 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, []);
   useEffect(() => {
-    if (ready) localStorage.setItem("slicer-cart", JSON.stringify(items));
+    if (ready) {
+      try {
+        localStorage.setItem("slicer-cart", JSON.stringify(items));
+      } catch {}
+    }
   }, [items, ready]);
   useEffect(() => {
     if (opened) {
@@ -441,8 +445,14 @@ export function CartContents({ onNavigate }: { onNavigate?: () => void }) {
     </>
   );
 }
-export function Gallery({images}:{images?:Product['images']}) {
-  const media=images?.length?images:[{url:'/images/front.webp',alt:'Concept face',position:0},{url:'/images/back.webp',alt:'Concept dos',position:1},{url:'/images/detail.webp',alt:'Concept détail',position:2}];
+export function Gallery({ images }: { images?: Product["images"] }) {
+  const media = images?.length
+    ? images
+    : [
+        { url: "/images/front.webp", alt: "Concept face", position: 0 },
+        { url: "/images/back.webp", alt: "Concept dos", position: 1 },
+        { url: "/images/detail.webp", alt: "Concept détail", position: 2 },
+      ];
   const [current, setCurrent] = useState(0);
   const dialog = useRef<HTMLDialogElement>(null);
   return (
@@ -467,15 +477,8 @@ export function Gallery({images}:{images?:Product['images']}) {
             aria-pressed={current === i}
             onClick={() => setCurrent(i)}
           >
-            <img
-              src={v.url}
-              alt={v.alt}
-              width="90"
-              height="100"
-            />
-            <span>
-              0{i + 1} / VUE
-            </span>
+            <img src={v.url} alt={v.alt} width="90" height="100" />
+            <span>0{i + 1} / VUE</span>
           </button>
         ))}
       </div>
