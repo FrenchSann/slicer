@@ -15,7 +15,7 @@ import {
   PlusIcon,
   MinusIcon,
 } from "@radix-ui/react-icons";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, MotionConfig } from "motion/react";
 import { money, product, Product } from "@/lib/catalog";
 type Item = {
   id: string;
@@ -84,51 +84,53 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         .filter((i) => i.quantity > 0),
     );
   return (
-    <ShopContext.Provider
-      value={{
-        items,
-        change,
-        open: () => setOpened(true),
-        add: (item) => {
-          setItems((old) => {
-            const found = old.find((i) => i.id === item.id);
-            return found
-              ? old.map((i) =>
-                  i.id === item.id
-                    ? {
-                        ...i,
-                        quantity: Math.min(10, i.quantity + item.quantity),
-                      }
-                    : i,
-                )
-              : [...old, item];
-          });
-          setOpened(true);
-        },
-      }}
-    >
-      {children}
-      <dialog
-        ref={dialog}
-        className="cart-dialog"
-        onCancel={() => setOpened(false)}
-        onClick={(e) => {
-          if (e.target === dialog.current) setOpened(false);
+    <MotionConfig reducedMotion="user">
+      <ShopContext.Provider
+        value={{
+          items,
+          change,
+          open: () => setOpened(true),
+          add: (item) => {
+            setItems((old) => {
+              const found = old.find((i) => i.id === item.id);
+              return found
+                ? old.map((i) =>
+                    i.id === item.id
+                      ? {
+                          ...i,
+                          quantity: Math.min(10, i.quantity + item.quantity),
+                        }
+                      : i,
+                  )
+                : [...old, item];
+            });
+            setOpened(true);
+          },
         }}
       >
-        <div className="drawer-head">
-          <span className="eyebrow">VOTRE SÉLECTION</span>
-          <button
-            aria-label="Fermer le panier"
-            onClick={() => setOpened(false)}
-          >
-            <Cross1Icon />
-          </button>
-        </div>
-        <h2>LE PANIER.</h2>
-        <CartContents onNavigate={() => setOpened(false)} />
-      </dialog>
-    </ShopContext.Provider>
+        {children}
+        <dialog
+          ref={dialog}
+          className="cart-dialog"
+          onCancel={() => setOpened(false)}
+          onClick={(e) => {
+            if (e.target === dialog.current) setOpened(false);
+          }}
+        >
+          <div className="drawer-head">
+            <span className="eyebrow">VOTRE SÉLECTION</span>
+            <button
+              aria-label="Fermer le panier"
+              onClick={() => setOpened(false)}
+            >
+              <Cross1Icon />
+            </button>
+          </div>
+          <h2>LE PANIER.</h2>
+          <CartContents onNavigate={() => setOpened(false)} />
+        </dialog>
+      </ShopContext.Provider>
+    </MotionConfig>
   );
 }
 export function Header() {

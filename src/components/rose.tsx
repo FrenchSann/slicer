@@ -14,8 +14,103 @@ import {
   Float32BufferAttribute,
   DoubleSide,
   Group,
+  Mesh,
   MathUtils,
 } from "three";
+type SceneInput = React.RefObject<{ x: number; y: number; scroll: number }>;
+function Ribbon() {
+  const geometry = useMemo(() => {
+    const points: number[] = [],
+      indices: number[] = [];
+    for (let i = 0; i <= 100; i++) {
+      const t = (i / 100) * Math.PI * 1.75;
+      for (const side of [-1, 1]) {
+        const r = 1.9 + side * 0.14;
+        points.push(
+          Math.cos(t) * r,
+          Math.sin(t) * r * 0.55,
+          Math.sin(t * 1.6) * 0.4 + side * 0.15 * Math.sin(t * 2),
+        );
+      }
+      if (i < 100) {
+        const a = i * 2;
+        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+    }
+    const g = new BufferGeometry();
+    g.setAttribute("position", new Float32BufferAttribute(points, 3));
+    g.setIndex(indices);
+    g.computeVertexNormals();
+    return g;
+  }, []);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return (
+    <mesh
+      geometry={geometry}
+      position={[0, -0.5, -0.8]}
+      rotation={[0.1, 0.2, -0.45]}
+    >
+      <meshStandardMaterial
+        color="#eee8df"
+        side={DoubleSide}
+        roughness={0.75}
+      />
+    </mesh>
+  );
+}
+function DetachedPetal({
+  geometry,
+  position,
+  index,
+  input,
+}: {
+  geometry: BufferGeometry;
+  position: [number, number, number];
+  index: number;
+  input: SceneInput;
+}) {
+  const mesh = useRef<Mesh>(null);
+  useFrame((_, delta) => {
+    if (!mesh.current) return;
+    const dx = position[0] - input.current.x * 3,
+      dy = position[1] + input.current.y * 2;
+    const distance = Math.hypot(dx, dy);
+    const force = Math.max(0, 1 - distance / 1.8) * 0.2;
+    mesh.current.position.x = MathUtils.damp(
+      mesh.current.position.x,
+      position[0] + dx * force,
+      2,
+      delta,
+    );
+    mesh.current.position.y = MathUtils.damp(
+      mesh.current.position.y,
+      position[1] + dy * force + input.current.scroll * 0.08,
+      2,
+      delta,
+    );
+  });
+  return (
+    <Float
+      speed={0.65 + index * 0.1}
+      rotationIntensity={0.12}
+      floatIntensity={0.12}
+    >
+      <mesh
+        ref={mesh}
+        geometry={geometry}
+        position={position}
+        scale={0.4 + index * 0.04}
+        rotation={[0.8, index * 1.4, 0.6]}
+      >
+        <meshStandardMaterial
+          color="#e51b2b"
+          side={DoubleSide}
+          roughness={0.4}
+        />
+      </mesh>
+    </Float>
+  );
+}
 function petalGeometry(layer = 2) {
   const points: number[] = [];
   const indices: number[] = [];
@@ -99,30 +194,15 @@ function Flower({
         [1.8, -0.8, 0.2],
         [1.2, 1.7, -0.9],
       ].map((p, i) => (
-        <Float
+        <DetachedPetal
           key={i}
-          speed={0.65 + i * 0.1}
-          rotationIntensity={0.12}
-          floatIntensity={0.12}
-        >
-          <mesh
-            geometry={geometry}
-            position={p as [number, number, number]}
-            scale={0.28 + i * 0.06}
-            rotation={[0.8, i * 1.4, 0.6]}
-          >
-            <meshStandardMaterial
-              color="#e51b2b"
-              side={DoubleSide}
-              roughness={0.4}
-            />
-          </mesh>
-        </Float>
+          geometry={geometry}
+          position={p as [number, number, number]}
+          index={i}
+          input={input}
+        />
       ))}
-      <mesh position={[0, -1.3, -0.8]} rotation={[1.2, 0.3, 0.3]}>
-        <torusGeometry args={[1.75, 0.075, 8, 90, Math.PI * 1.35]} />
-        <meshStandardMaterial color="#f6f4f1" roughness={0.6} />
-      </mesh>
+      <Ribbon />
     </group>
   );
 }

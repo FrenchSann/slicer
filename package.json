@@ -39,5 +39,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test"
-  }
+  },
+  "type": "module"
 }

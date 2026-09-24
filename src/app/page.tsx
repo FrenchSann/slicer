@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import HeroScene from "@/components/hero-scene";
+import Halftone from "@/components/halftone";
 import { Signup } from "@/components/shop";
 import { ArrowRightIcon, ArrowDownIcon } from "@radix-ui/react-icons";
 import { getProduct } from "@/lib/data";
@@ -147,7 +148,7 @@ export default async function Home() {
           <Link className="text-link" href="/la-marque">
             Entrer dans l’univers SLICER <ArrowRightIcon />
           </Link>
-          <div className="dot-pattern" />
+          <Halftone />
         </div>
       </section>
       <section className="details-strip">

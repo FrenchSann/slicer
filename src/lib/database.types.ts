@@ -390,8 +390,10 @@ export type Database = {
         Row: {
           contact_email: string | null;
           id: number;
+          legal_copy: string | null;
           legal_verified: boolean;
           live_enabled: boolean;
+          privacy_copy: string | null;
           returns_copy: string | null;
           seller_address: string | null;
           seller_name: string | null;
@@ -399,12 +401,15 @@ export type Database = {
           shipping_copy: string | null;
           shipping_verified: boolean;
           tax_verified: boolean;
+          terms_copy: string | null;
         };
         Insert: {
           contact_email?: string | null;
           id: number;
+          legal_copy?: string | null;
           legal_verified?: boolean;
           live_enabled?: boolean;
+          privacy_copy?: string | null;
           returns_copy?: string | null;
           seller_address?: string | null;
           seller_name?: string | null;
@@ -412,12 +417,15 @@ export type Database = {
           shipping_copy?: string | null;
           shipping_verified?: boolean;
           tax_verified?: boolean;
+          terms_copy?: string | null;
         };
         Update: {
           contact_email?: string | null;
           id?: number;
+          legal_copy?: string | null;
           legal_verified?: boolean;
           live_enabled?: boolean;
+          privacy_copy?: string | null;
           returns_copy?: string | null;
           seller_address?: string | null;
           seller_name?: string | null;
@@ -425,6 +433,7 @@ export type Database = {
           shipping_copy?: string | null;
           shipping_verified?: boolean;
           tax_verified?: boolean;
+          terms_copy?: string | null;
         };
         Relationships: [];
       };
@@ -538,7 +547,6 @@ export type Database = {
         Args: { p_key: string; p_limit: number; p_seconds: number };
         Returns: boolean;
       };
-      is_admin: { Args: never; Returns: boolean };
       record_refund: {
         Args: { p_event: string; p_intent: string; p_refunded: number };
         Returns: undefined;
