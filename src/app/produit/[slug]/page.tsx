@@ -1,6 +1,64 @@
-import Link from 'next/link';
-import {notFound} from 'next/navigation';
-import {Gallery,Purchase} from '@/components/shop';
-import {getProduct} from '@/lib/data';
-export const dynamic='force-dynamic';
-export default async function ProductPage({params}:{params:Promise<{slug:string}>}){const {slug}=await params;const data=await getProduct(slug);if(!data)notFound();return <div className="page"><div className="breadcrumbs"><Link href="/collection">Collection</Link> / {data.name}</div><div className="product-page"><Gallery/><section><span className="eyebrow">SLICER / RASHGUARD NO-GI</span><h1>{data.name.split(' ').slice(0,2).join(' ')}<br/><em>{data.name.split(' ').slice(2).join(' ')}</em></h1><p className="description">{data.description}</p><Purchase data={data} preview={process.env.COMMERCE_MODE!=='live'}/><div className="product-info"><details open><summary>La pièce</summary><p>Rashguard ajusté à manches courtes. Blanc et rouge.<br/>{data.composition}</p></details><details><summary>Livraison & retours</summary><p>Destinations : Union européenne. Les frais seront présentés avant paiement. <Link href="/livraison-retours">Consulter les informations disponibles.</Link></p></details><details><summary>Entretien</summary><p>Consignes du fabricant en attente. Référez-vous à l’étiquette du vêtement ; aucune température de lavage n’est encore confirmée.</p></details></div></section></div></div>}
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Gallery, Purchase } from "@/components/shop";
+import { getProduct } from "@/lib/data";
+export const dynamic = "force-dynamic";
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const data = await getProduct(slug);
+  if (!data) notFound();
+  return (
+    <div className="page">
+      <div className="breadcrumbs">
+        <Link href="/collection">Collection</Link> / {data.name}
+      </div>
+      <div className="product-page">
+        <Gallery images={data.images}/>
+        <section>
+          <span className="eyebrow">SLICER / RASHGUARD NO-GI</span>
+          <h1>
+            {data.name.split(" ").slice(0, 2).join(" ")}
+            <br />
+            <em>{data.name.split(" ").slice(2).join(" ")}</em>
+          </h1>
+          <p className="description">{data.description}</p>
+          <Purchase
+            data={data}
+            preview={process.env.COMMERCE_MODE !== "live"}
+          />
+          <div className="product-info">
+            <details open>
+              <summary>La pièce</summary>
+              <p>
+                Rashguard ajusté à manches courtes. Blanc et rouge.
+                <br />
+                {data.composition}
+              </p>
+            </details>
+            <details>
+              <summary>Livraison & retours</summary>
+              <p>
+                Destinations : Union européenne. Les frais seront présentés
+                avant paiement.{" "}
+                <Link href="/livraison-retours">
+                  Consulter les informations disponibles.
+                </Link>
+              </p>
+            </details>
+            <details>
+              <summary>Entretien</summary>
+              <p>
+                Consignes du fabricant en attente. Référez-vous à l’étiquette du
+                vêtement ; aucune température de lavage n’est encore confirmée.
+              </p>
+            </details>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}

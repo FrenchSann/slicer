@@ -1,10 +1,400 @@
-import {requireAdmin} from '@/lib/db';
-import {login,logout,saveProduct,saveVariant,saveSettings,saveShipping,saveShipment,uploadImage,reorderImage,revokeTracking} from './actions';
-import AdminForm from '@/components/admin-form';
-import {eu,money} from '@/lib/catalog';
-export const dynamic='force-dynamic';
-export const metadata={title:'Administration'};
-function Field({name,label,value='',type='text'}:{name:string;label:string;value?:string|number|null;type?:string}){return <label className="field">{label}<input name={name} type={type} defaultValue={value??''} step={type==='number'?'any':undefined}/></label>}
-function Check({name,label,value=false}:{name:string;label:string;value?:boolean}){return <label className="consent"><input type="checkbox" name={name} defaultChecked={value}/>{label}</label>}
-export default async function Admin(){let session;try{session=await requireAdmin()}catch{return <div className="page prose"><span className="eyebrow">ESPACE PROTÉGÉ</span><h1>ADMINISTRATION.</h1><p>Connexion réservée aux administrateurs autorisés.</p><AdminForm action={login} label="Se connecter"><Field name="email" label="E-mail" type="email"/><Field name="password" label="Mot de passe" type="password"/></AdminForm></div>};const {db}=session;const [products,variants,orders,newsletter,settings,images,shipping]=await Promise.all([db.from('products').select('*').order('created_at'),db.from('variants').select('*').order('size'),db.from('orders').select('*,order_lines(*),shipments(*)').order('created_at',{ascending:false}).limit(100),db.from('newsletter').select('email,status,consent_at').order('consent_at',{ascending:false}).limit(200),db.from('store_settings').select('*').eq('id',1).single(),db.from('images').select('*').order('position'),db.from('shipping_rates').select('*')]);const s=settings.data;return <div className="page"><span className="eyebrow">SLICER / ADMINISTRATION</span><h1>LE STUDIO.</h1><form action={logout}><button className="text-link">Se déconnecter</button></form><div className="notice">Ventes serveur : {process.env.COMMERCE_MODE||'preview'}. Stock à vérifier physiquement avant publication. Toutes les données ci-dessous proviennent de Supabase.</div><h2 style={{fontSize:42,margin:'40px 0 20px'}}>PRODUITS & VARIANTES</h2><div className="admin-grid">{[...(products.data||[]),null].map((p,index)=><section className="admin-panel" key={p?.id||'new'}><h2>{p?.name||'Nouveau produit'}</h2><AdminForm action={saveProduct}><input type="hidden" name="id" value={p?.id||''}/><Field name="slug" label="Adresse (slug)" value={p?.slug}/><Field name="name" label="Nom" value={p?.name}/><Field name="description" label="Description" value={p?.description}/><Field name="composition" label="Composition" value={p?.composition}/><Check name="active" label="Visible au catalogue" value={p?.active}/></AdminForm>{p&&<details><summary>Variantes et inventaire</summary>{[...(variants.data||[]).filter(v=>v.product_id===p.id),null].map((v,i)=><AdminForm key={v?.id||i} action={saveVariant}><input type="hidden" name="id" value={v?.id||''}/><input type="hidden" name="product_id" value={p.id}/><Field name="size" label="Taille" value={v?.size}/><Field name="price" label="Prix TTC en euros" type="number" value={v?v.price/100:45}/><Field name="stock" label="Stock physique (réservations incluses)" type="number" value={v?.stock||0}/><p className="small">Réservé : {v?.reserved||0} · Précommandes réservées : {v?.preorder_reserved||0}</p><Check name="inventory_verified" label="Inventaire vérifié physiquement" value={v?.inventory_verified}/><Check name="preorder" label="Vendre en précommande" value={v?.preorder}/><Field name="preorder_limit" label="Capacité de précommande restante" type="number" value={v?.preorder_limit||0}/></AdminForm>)}</details>}</section>)}</div><h2 style={{fontSize:42,margin:'40px 0 20px'}}>IMAGES</h2><div className="admin-grid"><section className="admin-panel"><AdminForm action={uploadImage} label="Téléverser"><label className="field">Produit<select name="product_id">{products.data?.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label className="field">Image (JPEG, PNG, WebP, 5 Mo)<input name="file" type="file" accept="image/jpeg,image/png,image/webp" required/></label><Field name="alt" label="Description accessible"/><Field name="position" label="Position" type="number" value={0}/></AdminForm></section><section className="admin-panel">{images.data?.map(i=><AdminForm key={i.id} action={reorderImage}><input type="hidden" name="id" value={i.id}/><img src={i.url} alt={i.alt} width="80" height="90"/><Field name="alt" label="Description" value={i.alt}/><Field name="position" label="Position" type="number" value={i.position}/></AdminForm>)}</section></div><h2 style={{fontSize:42,margin:'40px 0 20px'}}>COMMANDES</h2>{!orders.data?.length?<p>Aucune commande.</p>:orders.data.map(o=><details key={o.id} className="admin-panel"><summary>{o.id.slice(0,8)} · {o.status} · {money(o.total)} · {o.mode}</summary><p>{o.email} — {o.country}</p>{o.order_lines.map((l:{id:string;name:string;size:string;quantity:number;unit_price:number})=><p key={l.id}>{l.name} / {l.size} / {l.quantity} × {money(l.unit_price)}</p>)}<pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(o.shipping_address,null,2)}</pre><AdminForm action={saveShipment}><input type="hidden" name="order_id" value={o.id}/><label className="field">État<select name="status" defaultValue={o.shipments?.status||'preparing'}><option value="preparing">En préparation</option><option value="shipped">Expédiée</option><option value="delivered">Livrée</option></select></label><Field name="carrier" label="Transporteur" value={o.shipments?.carrier}/><Field name="tracking_number" label="Numéro de suivi" value={o.shipments?.tracking_number}/></AdminForm><AdminForm action={revokeTracking} label="Révoquer le lien de suivi"><input type="hidden" name="order_id" value={o.id}/></AdminForm></details>)}<h2 style={{fontSize:42,margin:'40px 0 20px'}}>PARAMÈTRES COMMERCIAUX</h2><div className="admin-grid"><section className="admin-panel"><AdminForm action={saveSettings}><Field name="seller_name" label="Raison sociale" value={s?.seller_name}/><Field name="seller_address" label="Adresse professionnelle" value={s?.seller_address}/><Field name="seller_registration" label="Immatriculation / informations fiscales" value={s?.seller_registration}/><Field name="contact_email" label="E-mail public" type="email" value={s?.contact_email}/><label className="field">Livraison<textarea name="shipping_copy" defaultValue={s?.shipping_copy||''} rows={4}/></label><label className="field">Retours<textarea name="returns_copy" defaultValue={s?.returns_copy||''} rows={4}/></label><Check name="legal_verified" label="Documents légaux finalisés et vérifiés" value={s?.legal_verified}/><Check name="tax_verified" label="Fiscalité TTC validée" value={s?.tax_verified}/><Check name="shipping_verified" label="Transport, frais et délais opérationnels validés" value={s?.shipping_verified}/><Check name="live_enabled" label="Autoriser la vente (mode serveur live requis)" value={s?.live_enabled}/></AdminForm></section><section className="admin-panel"><h2>TARIFS DE LIVRAISON</h2>{shipping.data?.map(r=><p key={r.country}>{r.country} : {money(r.amount)} — {r.enabled?'actif':'inactif'}</p>)}<AdminForm action={saveShipping}><label className="field">Pays<select name="country">{eu.map(c=><option key={c}>{c}</option>)}</select></label><Field name="amount" label="Frais TTC en euros" type="number" value={0}/><Check name="enabled" label="Destination ouverte"/></AdminForm></section></div><h2 style={{fontSize:42,margin:'40px 0 20px'}}>NEWSLETTER</h2><table><thead><tr><th>E-mail</th><th>État</th><th>Consentement</th></tr></thead><tbody>{newsletter.data?.map(n=><tr key={n.email}><td>{n.email}</td><td>{n.status}</td><td>{new Date(n.consent_at).toLocaleDateString('fr-FR')}</td></tr>)}</tbody></table></div>}
-
+import { requireAdmin } from "@/lib/db";
+import {
+  login,
+  logout,
+  saveProduct,
+  saveVariant,
+  saveSettings,
+  saveShipping,
+  saveShipment,
+  uploadImage,
+  reorderImage,
+  revokeTracking,
+} from "./actions";
+import AdminForm from "@/components/admin-form";
+import { eu, money } from "@/lib/catalog";
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Administration" };
+function Field({
+  name,
+  label,
+  value = "",
+  type = "text",
+}: {
+  name: string;
+  label: string;
+  value?: string | number | null;
+  type?: string;
+}) {
+  return (
+    <label className="field">
+      {label}
+      <input
+        name={name}
+        type={type}
+        defaultValue={value ?? ""}
+        step={type === "number" ? "any" : undefined}
+      />
+    </label>
+  );
+}
+function Check({
+  name,
+  label,
+  value = false,
+}: {
+  name: string;
+  label: string;
+  value?: boolean;
+}) {
+  return (
+    <label className="consent">
+      <input type="checkbox" name={name} defaultChecked={value} />
+      {label}
+    </label>
+  );
+}
+export default async function Admin() {
+  let session;
+  try {
+    session = await requireAdmin();
+  } catch {
+    return (
+      <div className="page prose">
+        <span className="eyebrow">ESPACE PROTÉGÉ</span>
+        <h1>ADMINISTRATION.</h1>
+        <p>Connexion réservée aux administrateurs autorisés.</p>
+        <AdminForm action={login} label="Se connecter">
+          <Field name="email" label="E-mail" type="email" />
+          <Field name="password" label="Mot de passe" type="password" />
+        </AdminForm>
+      </div>
+    );
+  }
+  const { db } = session;
+  const [products, variants, orders, newsletter, settings, images, shipping] =
+    await Promise.all([
+      db.from("products").select("*").order("created_at"),
+      db.from("variants").select("*").order("size"),
+      db
+        .from("orders")
+        .select("*,order_lines(*),shipments(*)")
+        .order("created_at", { ascending: false })
+        .limit(100),
+      db
+        .from("newsletter")
+        .select("email,status,consent_at")
+        .order("consent_at", { ascending: false })
+        .limit(200),
+      db.from("store_settings").select("*").eq("id", 1).single(),
+      db.from("images").select("*").order("position"),
+      db.from("shipping_rates").select("*"),
+    ]);
+  const s = settings.data;
+  return (
+    <div className="page">
+      <span className="eyebrow">SLICER / ADMINISTRATION</span>
+      <h1>LE STUDIO.</h1>
+      <form action={logout}>
+        <button className="text-link">Se déconnecter</button>
+      </form>
+      <div className="notice">
+        Ventes serveur : {process.env.COMMERCE_MODE || "preview"}. Stock à
+        vérifier physiquement avant publication. Toutes les données ci-dessous
+        proviennent de Supabase.
+      </div>
+      <h2 style={{ fontSize: 42, margin: "40px 0 20px" }}>
+        PRODUITS & VARIANTES
+      </h2>
+      <div className="admin-grid">
+        {[...(products.data || []), null].map((p, index) => (
+          <section className="admin-panel" key={p?.id || "new"}>
+            <h2>{p?.name || "Nouveau produit"}</h2>
+            <AdminForm action={saveProduct}>
+              <input type="hidden" name="id" value={p?.id || ""} />
+              <Field name="slug" label="Adresse (slug)" value={p?.slug} />
+              <Field name="name" label="Nom" value={p?.name} />
+              <Field
+                name="description"
+                label="Description"
+                value={p?.description}
+              />
+              <Field
+                name="composition"
+                label="Composition"
+                value={p?.composition}
+              />
+              <Check
+                name="active"
+                label="Visible au catalogue"
+                value={p?.active}
+              />
+            </AdminForm>
+            {p && (
+              <details>
+                <summary>Variantes et inventaire</summary>
+                {[
+                  ...(variants.data || []).filter((v) => v.product_id === p.id),
+                  null,
+                ].map((v, i) => (
+                  <AdminForm key={v?.id || i} action={saveVariant}>
+                    <input type="hidden" name="id" value={v?.id || ""} />
+                    <input type="hidden" name="product_id" value={p.id} />
+                    <Field name="size" label="Taille" value={v?.size} />
+                    <Field
+                      name="price"
+                      label="Prix TTC en euros"
+                      type="number"
+                      value={v ? v.price / 100 : 45}
+                    />
+                    <Field
+                      name="stock"
+                      label="Stock physique (réservations incluses)"
+                      type="number"
+                      value={v?.stock || 0}
+                    />
+                    <p className="small">
+                      Réservé : {v?.reserved || 0} · Précommandes réservées :{" "}
+                      {v?.preorder_reserved || 0}
+                    </p>
+                    <Check
+                      name="inventory_verified"
+                      label="Inventaire vérifié physiquement"
+                      value={v?.inventory_verified}
+                    />
+                    <Check
+                      name="preorder"
+                      label="Vendre en précommande"
+                      value={v?.preorder}
+                    />
+                    <Field
+                      name="preorder_limit"
+                      label="Capacité de précommande restante"
+                      type="number"
+                      value={v?.preorder_limit || 0}
+                    />
+                  </AdminForm>
+                ))}
+              </details>
+            )}
+          </section>
+        ))}
+      </div>
+      <h2 style={{ fontSize: 42, margin: "40px 0 20px" }}>IMAGES</h2>
+      <div className="admin-grid">
+        <section className="admin-panel">
+          <AdminForm action={uploadImage} label="Téléverser">
+            <label className="field">
+              Produit
+              <select name="product_id">
+                {products.data?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              Image (JPEG, PNG, WebP, 5 Mo)
+              <input
+                name="file"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                required
+              />
+            </label>
+            <Field name="alt" label="Description accessible" />
+            <Field name="position" label="Position" type="number" value={0} />
+          </AdminForm>
+        </section>
+        <section className="admin-panel">
+          {images.data?.map((i) => (
+            <AdminForm key={i.id} action={reorderImage}>
+              <input type="hidden" name="id" value={i.id} />
+              <img src={i.url} alt={i.alt} width="80" height="90" />
+              <Field name="alt" label="Description" value={i.alt} />
+              <Field
+                name="position"
+                label="Position"
+                type="number"
+                value={i.position}
+              />
+            </AdminForm>
+          ))}
+        </section>
+      </div>
+      <h2 style={{ fontSize: 42, margin: "40px 0 20px" }}>COMMANDES</h2>
+      {!orders.data?.length ? (
+        <p>Aucune commande.</p>
+      ) : (
+        orders.data.map((o) => (
+          <details key={o.id} className="admin-panel">
+            <summary>
+              {o.id.slice(0, 8)} · {o.status} · {money(o.total)} · {o.mode}
+            </summary>
+            <p>
+              {o.email} — {o.country}
+            </p>
+            {o.order_lines.map(
+              (l: {
+                id: string;
+                name: string;
+                size: string;
+                quantity: number;
+                unit_price: number;
+              }) => (
+                <p key={l.id}>
+                  {l.name} / {l.size} / {l.quantity} × {money(l.unit_price)}
+                </p>
+              ),
+            )}
+            <pre style={{ whiteSpace: "pre-wrap" }}>
+              {JSON.stringify(o.shipping_address, null, 2)}
+            </pre>
+            <AdminForm action={saveShipment}>
+              <input type="hidden" name="order_id" value={o.id} />
+              <label className="field">
+                État
+                <select
+                  name="status"
+                  defaultValue={o.shipments?.status || "preparing"}
+                >
+                  <option value="preparing">En préparation</option>
+                  <option value="shipped">Expédiée</option>
+                  <option value="delivered">Livrée</option>
+                </select>
+              </label>
+              <Field
+                name="carrier"
+                label="Transporteur"
+                value={o.shipments?.carrier}
+              />
+              <Field
+                name="tracking_number"
+                label="Numéro de suivi"
+                value={o.shipments?.tracking_number}
+              />
+            </AdminForm>
+            <AdminForm
+              action={revokeTracking}
+              label="Révoquer le lien de suivi"
+            >
+              <input type="hidden" name="order_id" value={o.id} />
+            </AdminForm>
+          </details>
+        ))
+      )}
+      <h2 style={{ fontSize: 42, margin: "40px 0 20px" }}>
+        PARAMÈTRES COMMERCIAUX
+      </h2>
+      <div className="admin-grid">
+        <section className="admin-panel">
+          <AdminForm action={saveSettings}>
+            <Field
+              name="seller_name"
+              label="Raison sociale"
+              value={s?.seller_name}
+            />
+            <Field
+              name="seller_address"
+              label="Adresse professionnelle"
+              value={s?.seller_address}
+            />
+            <Field
+              name="seller_registration"
+              label="Immatriculation / informations fiscales"
+              value={s?.seller_registration}
+            />
+            <Field
+              name="contact_email"
+              label="E-mail public"
+              type="email"
+              value={s?.contact_email}
+            />
+            <label className="field">
+              Livraison
+              <textarea
+                name="shipping_copy"
+                defaultValue={s?.shipping_copy || ""}
+                rows={4}
+              />
+            </label>
+            <label className="field">
+              Retours
+              <textarea
+                name="returns_copy"
+                defaultValue={s?.returns_copy || ""}
+                rows={4}
+              />
+            </label>
+            <Check
+              name="legal_verified"
+              label="Documents légaux finalisés et vérifiés"
+              value={s?.legal_verified}
+            />
+            <Check
+              name="tax_verified"
+              label="Fiscalité TTC validée"
+              value={s?.tax_verified}
+            />
+            <Check
+              name="shipping_verified"
+              label="Transport, frais et délais opérationnels validés"
+              value={s?.shipping_verified}
+            />
+            <Check
+              name="live_enabled"
+              label="Autoriser la vente (mode serveur live requis)"
+              value={s?.live_enabled}
+            />
+          </AdminForm>
+        </section>
+        <section className="admin-panel">
+          <h2>TARIFS DE LIVRAISON</h2>
+          {shipping.data?.map((r) => (
+            <p key={r.country}>
+              {r.country} : {money(r.amount)} —{" "}
+              {r.enabled ? "actif" : "inactif"}
+            </p>
+          ))}
+          <AdminForm action={saveShipping}>
+            <label className="field">
+              Pays
+              <select name="country">
+                {eu.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <Field
+              name="amount"
+              label="Frais TTC en euros"
+              type="number"
+              value={0}
+            />
+            <Check name="enabled" label="Destination ouverte" />
+          </AdminForm>
+        </section>
+      </div>
+      <h2 style={{ fontSize: 42, margin: "40px 0 20px" }}>NEWSLETTER</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>E-mail</th>
+            <th>État</th>
+            <th>Consentement</th>
+          </tr>
+        </thead>
+        <tbody>
+          {newsletter.data?.map((n) => (
+            <tr key={n.email}>
+              <td>{n.email}</td>
+              <td>{n.status}</td>
+              <td>{new Date(n.consent_at).toLocaleDateString("fr-FR")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

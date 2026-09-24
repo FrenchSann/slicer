@@ -1,6 +1,69 @@
-import {serviceDb} from '@/lib/db';
-import {hash} from '@/lib/security';
-import {notFound} from 'next/navigation';
-import {money} from '@/lib/catalog';
-export const dynamic='force-dynamic';
-export default async function Tracking({params}:{params:Promise<{token:string}>}){const {token}=await params;if(!/^[a-f0-9]{64}$/.test(token))notFound();if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return <div className="page"><h1>SUIVI INDISPONIBLE.</h1><p>Réessayez dans quelques instants.</p></div>;const {data:o}=await serviceDb().from('orders').select('id,status,total,created_at,order_lines(name,size,quantity,unit_price),shipments(status,tracking_number,carrier)').eq('token_hash',hash(token)).single();if(!o)notFound();const labels:Record<string,string>={pending:'Confirmation du paiement en attente',paid:'Paiement confirmé',expired:'Session de paiement expirée',refunded:'Commande remboursée',partially_refunded:'Commande partiellement remboursée'};return <div className="page prose"><span className="eyebrow">SUIVI SÉCURISÉ</span><h1>VOTRE COMMANDE.</h1><div className="notice">{labels[o.status]}</div><p>Référence : {o.id}</p>{o.order_lines.map((l,i)=><p key={i}>{l.name} · {l.size} · {l.quantity} × {money(l.unit_price)}</p>)}<p>Total : {money(o.total)}</p>{o.shipments?.map((s,i)=><p key={i}>Expédition : {s.status==='preparing'?'En préparation':s.status==='shipped'?'Expédiée':'Livrée'}{s.tracking_number&&<> · {s.carrier} — {s.tracking_number}</>}</p>)}<p className="small">Conservez ce lien privé. Actualisez la page pour obtenir le dernier état.</p></div>}
+import { serviceDb } from "@/lib/db";
+import { hash } from "@/lib/security";
+import { notFound } from "next/navigation";
+import { money } from "@/lib/catalog";
+export const dynamic = "force-dynamic";
+export default async function Tracking({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  const { token } = await params;
+  if (!/^[a-f0-9]{64}$/.test(token)) notFound();
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY)
+    return (
+      <div className="page">
+        <h1>SUIVI INDISPONIBLE.</h1>
+        <p>Réessayez dans quelques instants.</p>
+      </div>
+    );
+  const { data: o } = await serviceDb()
+    .from("orders")
+    .select(
+      "id,status,total,created_at,order_lines(name,size,quantity,unit_price),shipments(status,tracking_number,carrier)",
+    )
+    .eq("token_hash", hash(token))
+    .single();
+  if (!o) notFound();
+  const labels: Record<string, string> = {
+    pending: "Confirmation du paiement en attente",
+    paid: "Paiement confirmé",
+    expired: "Session de paiement expirée",
+    refunded: "Commande remboursée",
+    partially_refunded: "Commande partiellement remboursée",
+  };
+  return (
+    <div className="page prose">
+      <span className="eyebrow">SUIVI SÉCURISÉ</span>
+      <h1>VOTRE COMMANDE.</h1>
+      <div className="notice">{labels[o.status]}</div>
+      <p>Référence : {o.id}</p>
+      {o.order_lines.map((l, i) => (
+        <p key={i}>
+          {l.name} · {l.size} · {l.quantity} × {money(l.unit_price)}
+        </p>
+      ))}
+      <p>Total : {money(o.total)}</p>
+      {o.shipments?.map((s, i) => (
+        <p key={i}>
+          Expédition :{" "}
+          {s.status === "preparing"
+            ? "En préparation"
+            : s.status === "shipped"
+              ? "Expédiée"
+              : "Livrée"}
+          {s.tracking_number && (
+            <>
+              {" "}
+              · {s.carrier} — {s.tracking_number}
+            </>
+          )}
+        </p>
+      ))}
+      <p className="small">
+        Conservez ce lien privé. Actualisez la page pour obtenir le dernier
+        état.
+      </p>
+    </div>
+  );
+}
