@@ -3,10 +3,6 @@
 Boutique Next.js / TypeScript, rose procédurale React Three Fiber, Supabase et Stripe Checkout.
 
 - Site : https://slicer-navy.vercel.app
-- Dépôt privé : https://github.com/FrenchSann/slicer
-- Administration : https://slicer-navy.vercel.app/admin
-- Supabase : projet `xoqgrlpzpjymsjbbhwan`, région Paris (`eu-west-3`).
-- Vercel : `frenchsanns-projects/slicer`, fonctions à Paris.
 
 Le déploiement est une prévisualisation fonctionnelle : `COMMERCE_MODE=preview`. Le paiement affiche une indisponibilité explicite. Les prix sont réels (45 EUR TTC) ; aucun stock estimé n’est publié. Le stock initial de la base est zéro, à vérifier par taille avant ouverture. Les médias fournis sont des visuels conceptuels.
 
@@ -39,7 +35,7 @@ Le dernier script teste le déploiement public en prévisualisation et les polit
 | `NEXT_PUBLIC_SITE_URL` | Configurée sur l’URL Vercel. À modifier avec un futur domaine. |
 | `TOKEN_SECRET`, `CRON_SECRET` | Générés aléatoirement et configurés côté serveur Vercel, jamais dans Git. |
 | `SUPABASE_SERVICE_ROLE_KEY` | À ajouter dans Vercel et dans l’environnement local privé pour commandes, formulaires et tâches serveur. |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | À fournir depuis le compte SLICER dédié, d’abord en test. Le compte Bowimmo connecté n’a pas été utilisé pour des opérations de paiement. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | À fournir depuis le compte SLICER dédié, d’abord en test. |
 | `RESEND_API_KEY`, `EMAIL_FROM`, `CONTACT_EMAIL` | À fournir avec un domaine d’envoi vérifié. Formulaires fermés tant que leur intégration manque. |
 | Administrateur | Créer/inviter un utilisateur réel via Supabase Auth, puis autoriser son UUID comme indiqué ci-dessous. |
 | Informations commerciales | Identité du vendeur, immatriculation, fiscalité, documents légaux, tarifs/délais et retours définitifs, inventaire exact et mesures fabricant. |
